@@ -22,7 +22,7 @@ if [ ! -f "$PLUGIN_JAR" ]; then
   echo "FATAL: plugin JAR not found at $PLUGIN_JAR"; exit 1
 fi
 
-TMP_POM_DIR="/tmp/refactoring-cli"
+TMP_POM_DIR="$HOME/refactoring-cli"
 mkdir -p "$TMP_POM_DIR"
 
 jar xf "$PLUGIN_JAR" \
@@ -65,7 +65,7 @@ cp "$PLUGIN_JAR" "$ECLIPSE_HOME/dropins/"
 # ------------------------------
 # Generate cleanup XML profile
 # ------------------------------
-PROFILE_FILE="/tmp/cleanup-profile.xml"
+PROFILE_FILE="$HOME/cleanup-profile.xml"
 
 cat > "$PROFILE_FILE" <<EOF
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -93,7 +93,7 @@ cat "$PROFILE_FILE"
 # Run cleanup
 # ------------------------------
 
-WORKSPACE="/tmp/eclipse-workspace"
+WORKSPACE="$HOME/eclipse-workspace"
 mkdir -p "$WORKSPACE"
 
 echo "Running Eclipse cleanup using workspace: $WORKSPACE"
@@ -107,38 +107,33 @@ set +e
   --source "$SOURCE_LEVEL" \
   --classpath "$EXTRA_CLASSPATH" \
   "$PROJECT_ROOT"
+
 EXIT_CODE=$?
 set -e
 
-echo
-echo "=========== ECLIPSE LOG OUTPUT ==========="
+echo "Eclipse exit code: $EXIT_CODE"
 
-LOG_DIR="$ECLIPSE_HOME/configuration"
+# ------------------------------
+# Show log if Eclipse failed
+# ------------------------------
 
-if [ -d "$LOG_DIR" ]; then
-    echo "Log directory: $LOG_DIR"
-    echo "Contents:"
-    ls -al "$LOG_DIR"
-
-    LOG_FILE=$(ls -1t "$LOG_DIR"/*.log 2>/dev/null | head -1 || true)
-
-    if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
-        echo
-        echo "Showing latest log file: $LOG_FILE"
-        echo "------------------------------------"
-        cat "$LOG_FILE"
-        echo
-    else
-        echo "No .log file found in configuration directory."
-    fi
-else
-    echo "Log directory does not exist: $LOG_DIR"
-fi
-
-echo "=========================================="
-echo "Eclipse exit code = $EXIT_CODE"
+LOG_FILE="$WORKSPACE/.metadata/.log"
 
 if [ "$EXIT_CODE" -ne 0 ]; then
-    echo "ERROR: Eclipse terminated with failure."
-    exit "$EXIT_CODE"
+  echo "=========================================="
+  echo "Eclipse reported an error."
+  echo "Log file path: $LOG_FILE"
+  echo "=========================================="
+
+  if [ -f "$LOG_FILE" ]; then
+    echo "---------- ECLIPSE LOG BEGIN ----------"
+    cat "$LOG_FILE"
+    echo "----------- ECLIPSE LOG END -----------"
+  else
+    echo "No Eclipse log file found!"
+  fi
+
+  exit "$EXIT_CODE"
+else
+  echo "Cleanup completed successfully."
 fi

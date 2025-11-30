@@ -18,10 +18,10 @@ URL="${BASE_URL}?file=${FILE_PATH}&r=1"
 echo "Downloading Eclipse:"
 echo "  ${URL}"
 
-curl -L "$URL" -o /tmp/eclipse.tar.gz
+curl -L "$URL" -o $HOME/eclipse.tar.gz
 
 mkdir -p /opt/eclipse
-tar -xf /tmp/eclipse.tar.gz -C /opt
+tar -xf $HOME/eclipse.tar.gz -C /opt
 
 # Find extracted Eclipse dir (eclipse, eclipse-java-*, etc.)
 ECLIPSE_DIR=$(find /opt -maxdepth 1 -type d -name "eclipse*" | head -1)
