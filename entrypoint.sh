@@ -16,7 +16,7 @@ fi
 # ------------------------------
 # Extract pom.xml from plugin
 # ------------------------------
-PLUGIN_JAR="/opt/refactoring-cli.jar"
+PLUGIN_JAR="/opt/io.github.nbauma109.refactoring.cli-1.0.0.jar"
 
 if [ ! -f "$PLUGIN_JAR" ]; then
   echo "FATAL: plugin JAR not found at $PLUGIN_JAR"; exit 1
