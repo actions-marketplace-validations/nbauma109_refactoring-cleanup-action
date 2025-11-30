@@ -15,8 +15,18 @@ fi
 # Convert to absolute paths
 PROJECT_ROOT="$(realpath "$PROJECT_ROOT")"
 
+# Normalize EXTRA_CLASSPATH into absolute paths
 if [ -n "$EXTRA_CLASSPATH" ]; then
-  EXTRA_CLASSPATH="$(realpath "$EXTRA_CLASSPATH")"
+  ABS_CLASSPATH=""
+  IFS=':' read -ra CP_ENTRIES <<< "$EXTRA_CLASSPATH"
+  for entry in "${CP_ENTRIES[@]}"; do
+    if [ -z "$entry" ]; then
+      continue
+    fi
+    abs="$(realpath "$entry")"
+    ABS_CLASSPATH="${ABS_CLASSPATH:+$ABS_CLASSPATH:}$abs"
+  done
+  EXTRA_CLASSPATH="$ABS_CLASSPATH"
 fi
 
 # ------------------------------
