@@ -1,105 +1,103 @@
 #!/bin/bash
 set -euo pipefail
 
-# --------------------------------------------------------------------
-# Inputs from GitHub Action (all optional → default to empty string)
-# --------------------------------------------------------------------
-
 PROJECT_ROOT="${INPUT_PROJECT_ROOT:-}"
 SOURCE_LEVEL="${INPUT_SOURCE_LEVEL:-}"
 EXTRA_CLASSPATH="${INPUT_EXTRA_CLASSPATH:-}"
-CLEANUP_OPTIONS_JSON="${INPUT_CLEANUP_OPTIONS_JSON:-}"
 
-# Fail hard if mandatory ones are missing
 if [ -z "$PROJECT_ROOT" ]; then
-    echo "FATAL: INPUT_PROJECT_ROOT is required."
-    exit 1
+  echo "FATAL: INPUT_PROJECT_ROOT is required"; exit 1
 fi
 
 if [ -z "$SOURCE_LEVEL" ]; then
-    echo "FATAL: INPUT_SOURCE_LEVEL is required."
-    exit 1
+  echo "FATAL: INPUT_SOURCE_LEVEL is required"; exit 1
 fi
 
-if [ -z "$CLEANUP_OPTIONS_JSON" ]; then
-    echo "FATAL: INPUT_CLEANUP_OPTIONS_JSON is required."
-    exit 1
+# ------------------------------
+# Extract pom.xml from plugin
+# ------------------------------
+PLUGIN_JAR="/opt/refactoring-cli.jar"
+
+if [ ! -f "$PLUGIN_JAR" ]; then
+  echo "FATAL: plugin JAR not found at $PLUGIN_JAR"; exit 1
 fi
 
-# --------------------------------------------------------------------
-# Extract Eclipse release version from plugin JAR pom.xml
-# --------------------------------------------------------------------
+TMP_POM_DIR="/tmp/refactoring-cli"
+mkdir -p "$TMP_POM_DIR"
 
-echo "Extracting Eclipse release tag from embedded plugin POM..."
+jar xf "$PLUGIN_JAR" \
+  META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml
 
-TMP_DIR="/tmp/refactoring-cli-pom"
-mkdir -p "$TMP_DIR"
-
-jar xf /opt/refactoring-cli-plugin.jar \
-  META-INF/maven/io.github.nbauma109/refactoring-cli/pom.xml
-
-# Move to predictable temp path
-if [ -f "META-INF/maven/io.github.nbauma109/refactoring-cli/pom.xml" ]; then
-    mkdir -p "$TMP_DIR/META-INF/maven/io.github.nbauma109/"
-    mv META-INF/maven/io.github.nbauma109/refactoring-cli/pom.xml "$TMP_DIR/META-INF/maven/io.github.nbauma109/"
-    rm -rf META-INF
+if [ ! -f META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml ]; then
+  echo "FATAL: Could not extract pom.xml from plugin JAR."; exit 1
 fi
 
-POM="$TMP_DIR/META-INF/maven/io.github.nbauma109/refactoring-cli/pom.xml"
+mkdir -p "$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/refactoring.cli"
+mv META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml \
+   "$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml"
 
-if [ ! -f "$POM" ]; then
-    echo "FATAL: pom.xml could not be extracted from plugin jar!"
-    exit 1
-fi
+rm -rf META-INF
+
+POM="$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml"
 
 ECLIPSE_REPO_URL=$(grep -oPm1 "(?<=<eclipse.release.repo>)[^<]+" "$POM" || true)
 
-if [ -z "$ECLIPSE_REPO_URL" ]; then
-    echo "FATAL: eclipse.release.repo not found inside plugin pom.xml!"
-    exit 1
-fi
-
-echo "Found eclipse.release.repo: $ECLIPSE_REPO_URL"
-
-# Convert:
-#   https://download.eclipse.org/releases/2025-09
-# →  "2025-09"
 ECLIPSE_VERSION="${ECLIPSE_REPO_URL##*/}"
 
-echo "Using Eclipse version: $ECLIPSE_VERSION"
+if [ -z "$ECLIPSE_VERSION" ]; then
+  echo "FATAL: Could not extract Eclipse version from pom.xml"; exit 1
+fi
 
-rm -rf "$TMP_DIR"
+echo "Using Eclipse release: $ECLIPSE_VERSION"
 
-# --------------------------------------------------------------------
+rm -rf "$TMP_POM_DIR"
+
+# ------------------------------
 # Download Eclipse
-# --------------------------------------------------------------------
-
-echo "Downloading Eclipse $ECLIPSE_VERSION..."
+# ------------------------------
 eclipse-download "$ECLIPSE_VERSION" "java"
 
 ECLIPSE_HOME=$(cat /opt/eclipse_home)
-echo "ECLIPSE_HOME = $ECLIPSE_HOME"
 
-# --------------------------------------------------------------------
-# Install plugin jar into dropins
-# --------------------------------------------------------------------
-
-echo "Installing plugin into Eclipse dropins..."
+echo "Installing plugin..."
 mkdir -p "$ECLIPSE_HOME/dropins/refactoring-cli"
-cp /opt/refactoring-cli-plugin.jar "$ECLIPSE_HOME/dropins/refactoring-cli/"
+cp "$PLUGIN_JAR" "$ECLIPSE_HOME/dropins/refactoring-cli/"
 
-# --------------------------------------------------------------------
-# Run cleanup tool
-# --------------------------------------------------------------------
+# ------------------------------
+# Generate cleanup XML profile
+# ------------------------------
+PROFILE_FILE="/tmp/cleanup-profile.xml"
 
-echo "Running cleanup..."
+cat > "$PROFILE_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<profiles version="2">
+  <profile kind="CleanUpProfile" name="github-action" version="2">
+EOF
+
+while IFS='=' read -r key val; do
+  if [[ "$key" =~ ^INPUT_CLEANUP_ ]]; then
+    raw="${key#INPUT_CLEANUP_}"
+    setting=$(echo "$raw" | tr '[:upper:]' '[:lower:]' | tr '_' '.')
+    echo "    <setting id=\"cleanup.$setting\" value=\"$val\"/>" >> "$PROFILE_FILE"
+  fi
+done < <(env)
+
+cat >> "$PROFILE_FILE" <<EOF
+  </profile>
+</profiles>
+EOF
+
+echo "Generated cleanup profile:"
+cat "$PROFILE_FILE"
+
+# ------------------------------
+# Run cleanup
+# ------------------------------
 
 "$ECLIPSE_HOME/eclipse" \
   -nosplash \
   -application io.github.nbauma109.refactoring.cli.app \
+  --profile "$PROFILE_FILE" \
   --source "$SOURCE_LEVEL" \
   --classpath "$EXTRA_CLASSPATH" \
-  --cleanup-options "$CLEANUP_OPTIONS_JSON" \
   "$PROJECT_ROOT"
-
-echo "Cleanup complete."
