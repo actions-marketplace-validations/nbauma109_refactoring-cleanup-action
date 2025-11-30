@@ -26,19 +26,19 @@ TMP_POM_DIR="/tmp/refactoring-cli"
 mkdir -p "$TMP_POM_DIR"
 
 jar xf "$PLUGIN_JAR" \
-  META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml
+  META-INF/maven/io.github.nbauma109/io.github.nbauma109.refactoring.cli/pom.xml
 
-if [ ! -f META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml ]; then
+if [ ! -f META-INF/maven/io.github.nbauma109/io.github.nbauma109.refactoring.cli/pom.xml ]; then
   echo "FATAL: Could not extract pom.xml from plugin JAR."; exit 1
 fi
 
-mkdir -p "$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/refactoring.cli"
-mv META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml \
-   "$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml"
+mkdir -p "$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/io.github.nbauma109.refactoring.cli"
+mv META-INF/maven/io.github.nbauma109/io.github.nbauma109.refactoring.cli/pom.xml \
+   "$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/io.github.nbauma109.refactoring.cli/pom.xml"
 
 rm -rf META-INF
 
-POM="$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/refactoring.cli/pom.xml"
+POM="$TMP_POM_DIR/META-INF/maven/io.github.nbauma109/io.github.nbauma109.refactoring.cli/pom.xml"
 
 ECLIPSE_REPO_URL=$(grep -oPm1 "(?<=<eclipse.release.repo>)[^<]+" "$POM" || true)
 
