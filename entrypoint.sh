@@ -1,35 +1,77 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_ROOT="$1"
-SOURCE_LEVEL="$2"
-EXTRA_CLASSPATH="$3"
-CLEANUP_OPTIONS_JSON="$4"
+# --------------------------------------------------------------------
+# Inputs
+# These environment variables are supplied by GitHub Actions "with:"
+# --------------------------------------------------------------------
 
-POM_FILE="$PROJECT_ROOT/refactoring-cli/pom.xml"
+PROJECT_ROOT="${INPUT_PROJECT_ROOT}"
+SOURCE_LEVEL="${INPUT_SOURCE_LEVEL}"
+EXTRA_CLASSPATH="${INPUT_EXTRA_CLASSPATH}"
+CLEANUP_OPTIONS_JSON="${INPUT_CLEANUP_OPTIONS_JSON}"
 
-echo "Extracting Eclipse release from pom.xml..."
+# --------------------------------------------------------------------
+# Extract Eclipse release tag from the plugin JAR
+# refactoring-cli-plugin.jar includes the Maven pom metadata
+# --------------------------------------------------------------------
 
-ECLIPSE_REPO=$(grep -oPm1 "(?<=<eclipse.release.repo>)[^<]+" "$POM_FILE")
-# Example: https://download.eclipse.org/releases/2025-09
+echo "Extracting Eclipse release tag from embedded plugin POM..."
 
-ECLIPSE_VERSION=$(basename "$ECLIPSE_REPO")
-# Extracts: 2025-09
+TMP_DIR="/tmp/refactoring-cli-pom"
+mkdir -p "$TMP_DIR"
 
-ECLIPSE_PACKAGE="java"  # internal decision — not user-configurable
+jar xf /opt/refactoring-cli-plugin.jar \
+  META-INF/maven/io.github.nbauma109/refactoring-cli/pom.xml
 
-echo "Detected Eclipse release: $ECLIPSE_VERSION"
+POM="$TMP_DIR/META-INF/maven/io.github.nbauma109/refactoring-cli/pom.xml"
 
-echo "Downloading Eclipse..."
-eclipse-download "$ECLIPSE_VERSION" "$ECLIPSE_PACKAGE"
+# Move extracted file to our tmp directory
+if [ -f "META-INF/maven/io.github.nbauma109/refactoring-cli/pom.xml" ]; then
+    mv META-INF/maven/io.github.nbauma109/refactoring-cli "$TMP_DIR/META-INF/maven/io.github.nbauma109/"
+    rm -rf META-INF
+fi
+
+if [ ! -f "$POM" ]; then
+    echo "FATAL: pom.xml not found inside plugin JAR!"
+    exit 1
+fi
+
+ECLIPSE_REPO_URL=$(grep -oPm1 "(?<=<eclipse.release.repo>)[^<]+" "$POM")
+echo "Found eclipse.release.repo: $ECLIPSE_REPO_URL"
+
+# Extract release version (example: https://download.eclipse.org/releases/2025-09 → 2025-09)
+ECLIPSE_VERSION="${ECLIPSE_REPO_URL##*/}"
+
+echo "Resolved Eclipse version: $ECLIPSE_VERSION"
+
+rm -rf "$TMP_DIR"
+
+# --------------------------------------------------------------------
+# Download Eclipse distribution (via helper script)
+# --------------------------------------------------------------------
+
+echo "Downloading Eclipse $ECLIPSE_VERSION..."
+eclipse-download "$ECLIPSE_VERSION" "java"
 
 ECLIPSE_HOME=$(cat /opt/eclipse_home)
 
-echo "Installing plugin..."
+echo "Eclipse installed at: $ECLIPSE_HOME"
+
+# --------------------------------------------------------------------
+# Install plugin JAR into dropins
+# --------------------------------------------------------------------
+
+echo "Installing plugin JAR into dropins..."
 mkdir -p "$ECLIPSE_HOME/dropins/refactoring-cli"
 cp /opt/refactoring-cli-plugin.jar "$ECLIPSE_HOME/dropins/refactoring-cli/"
 
-echo "Running cleanup..."
+# --------------------------------------------------------------------
+# Run cleanup application
+# --------------------------------------------------------------------
+
+echo "Running refactoring cleanup..."
+
 "$ECLIPSE_HOME/eclipse" \
   -nosplash \
   -application io.github.nbauma109.refactoring.cli.app \
@@ -37,3 +79,5 @@ echo "Running cleanup..."
   --classpath "$EXTRA_CLASSPATH" \
   --cleanup-options "$CLEANUP_OPTIONS_JSON" \
   "$PROJECT_ROOT"
+
+echo "Cleanup execution finished."
