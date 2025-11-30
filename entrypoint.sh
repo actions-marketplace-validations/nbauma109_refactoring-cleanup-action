@@ -77,8 +77,7 @@ eclipse-download "$ECLIPSE_VERSION" "java"
 ECLIPSE_HOME=$(cat /opt/eclipse_home)
 
 echo "Installing plugin JAR into $ECLIPSE_HOME/dropins/"
-mkdir -p "$ECLIPSE_HOME/dropins/refactoring-cli"
-cp "$PLUGIN_JAR" "$ECLIPSE_HOME/dropins/refactoring-cli/"
+cp "$PLUGIN_JAR" "$ECLIPSE_HOME/dropins/"
 
 # ------------------------------
 # Generate cleanup XML profile
