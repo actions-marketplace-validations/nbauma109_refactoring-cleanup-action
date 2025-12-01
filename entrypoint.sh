@@ -48,7 +48,7 @@ mkdir -p "$WORKSPACE_DIR"
 # ------------------------------
 FORMATTER_PREFS="$WORKSPACE_DIR/.metadata/.plugins/org.eclipse.core.runtime/.settings/org.eclipse.jdt.core.prefs"
 
-mkdir -p "$FORMATTER_PREFS"
+mkdir -p "$(dirname "$FORMATTER_PREFS")"
 
 cat > "$FORMATTER_PREFS" <<EOF
 eclipse.preferences.version=1
