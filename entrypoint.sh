@@ -52,6 +52,8 @@ mkdir -p "$(dirname "$FORMATTER_PREFS")"
 
 cat > "$FORMATTER_PREFS" <<EOF
 eclipse.preferences.version=1
+org.eclipse.jdt.core.formatter.indent_switchstatements_compare_to_cases=true
+org.eclipse.jdt.core.formatter.indent_switchstatements_compare_to_switch=true
 org.eclipse.jdt.core.formatter.use_tabs_only_for_leading_indentations=false
 org.eclipse.jdt.core.formatter.tabulation.char=space
 org.eclipse.jdt.core.formatter.tabulation.size=4
